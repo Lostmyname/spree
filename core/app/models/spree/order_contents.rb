@@ -34,12 +34,18 @@ module Spree
 
     private
       def after_add_or_remove(line_item, options = {})
-        reload_totals
+
+        unless options.fetch(:surpress_reload, false)
+          reload_totals
+        end
         shipment = options[:shipment]
         shipment.present? ? shipment.update_amounts : order.ensure_updated_shipments
         PromotionHandler::Cart.new(order, line_item).activate
         ItemAdjustments.new(line_item).update
-        reload_totals
+
+        unless options.fetch(:surpress_reload, false)
+          reload_totals
+        end
         line_item
       end
 
