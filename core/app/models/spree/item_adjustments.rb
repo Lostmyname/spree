@@ -5,10 +5,12 @@ module Spree
     define_callbacks :promo_adjustments, :tax_adjustments
     attr_reader :item
 
-    delegate :adjustments, :order, to: :item
+    delegate :adjustments, to: :item
+    attr_reader :order
 
-    def initialize(item)
+    def initialize(item, order=nil)
       @item = item
+      @order = order || (item.respond_to?(:order) ? item.order : item)
 
       # Don't attempt to reload the item from the DB if it's not there
       @item.reload if @item.instance_of?(Shipment) && @item.persisted?
@@ -35,34 +37,37 @@ module Spree
       # Included tax adjustments are those which are included in the price.
       # These ones should not affect the eventual total price.
       #
-      # Additional tax adjustments are the opposite, affecting the final total.
-      promo_total = 0
-      run_callbacks :promo_adjustments do
-        promotion_total = adjustments.promotion.reload.map do |adjustment|
-          adjustment.update!(@item)
-        end.compact.sum
+      #
+        promo_total = 0
+        run_callbacks :promo_adjustments do
+          promotion_total = nil
+          promotion_total = adjustments.promotion.reload.map do |adjustment|
+            adjustment.update!(@item, @order)
+          end.compact.sum
 
-        unless promotion_total == 0
-          choose_best_promotion_adjustment
+          all_adjustments = @order.all_adjustments.includes(source: :promotion).includes(:adjustable)
+
+          unless promotion_total == 0
+            choose_best_promotion_adjustment(all_adjustments)
+          end
+          promo_total = best_promotion_adjustment(all_adjustments).try(:amount).to_f
         end
-        promo_total = best_promotion_adjustment.try(:amount).to_f
-      end
 
-      included_tax_total = 0
-      additional_tax_total = 0
-      run_callbacks :tax_adjustments do
-        tax = (item.respond_to?(:all_adjustments) ? item.all_adjustments : item.adjustments).tax
-        included_tax_total = tax.is_included.reload.map(&:update!).compact.sum
-        additional_tax_total = tax.additional.reload.map(&:update!).compact.sum
-      end
+        included_tax_total = 0
+        additional_tax_total = 0
+        run_callbacks :tax_adjustments do
+          tax = (item.respond_to?(:all_adjustments) ? item.all_adjustments : item.adjustments).tax
+          included_tax_total = tax.is_included.reload.map(&:update!).compact.sum
+          additional_tax_total = tax.additional.reload.map(&:update!).compact.sum
+        end
 
-      item.update_columns(
-        :promo_total => promo_total,
-        :included_tax_total => included_tax_total,
-        :additional_tax_total => additional_tax_total,
-        :adjustment_total => promo_total + additional_tax_total,
-        :updated_at => Time.now,
-      )
+        item.update_columns(
+          :promo_total => promo_total,
+          :included_tax_total => included_tax_total,
+          :additional_tax_total => additional_tax_total,
+          :adjustment_total => promo_total + additional_tax_total,
+          :updated_at => Time.now,
+        )
     end
 
     # Picks one (and only one) promotion to be eligible for this order

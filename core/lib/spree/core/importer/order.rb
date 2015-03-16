@@ -15,7 +15,6 @@ module Spree
             order.associate_user!(user)
 
             shipments_attrs = params.delete(:shipments_attributes)
-
             create_shipments_from_params(shipments_attrs, order)
             create_line_items_from_params(params.delete(:line_items_attributes),order)
 
@@ -44,7 +43,7 @@ module Spree
             order.reload
           rescue Exception => e
             order.destroy if order && order.persisted?
-            raise e.message
+            raise
           end
         end
 

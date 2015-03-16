@@ -89,10 +89,15 @@ module Spree
     #
     # If the adjustment has no source, do not attempt to re-calculate the amount.
     # Chances are likely that this was a manually created adjustment in the admin backend.
-    def update!(target = nil)
+    def update!(target = nil, order=nil)
       return amount if closed?
       if source.present?
-        amount = source.compute_amount(target || adjustable)
+        amount = nil
+        if order
+          amount = source.compute_amount(target || adjustable, order)
+        else
+          amount = source.compute_amount(target || adjustable)
+        end
         self.update_columns(
           amount: amount,
           updated_at: Time.now,

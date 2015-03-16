@@ -39,9 +39,14 @@ module Spree
           reload_totals
         end
         shipment = options[:shipment]
-        shipment.present? ? shipment.update_amounts : order.ensure_updated_shipments
+          if shipment.present?
+            shipment.update_amounts
+          else
+            order.ensure_updated_shipments
+          end
+
         PromotionHandler::Cart.new(order, line_item).activate
-        ItemAdjustments.new(line_item).update
+        ItemAdjustments.new(line_item, order).update
 
         unless options.fetch(:surpress_reload, false)
           reload_totals

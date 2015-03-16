@@ -23,7 +23,7 @@ module Spree
           "#{Spree.t(:promotion)} (#{promotion.name})"
         end
 
-        def compute_amount(shipment)
+        def compute_amount(shipment, order=nil)
           shipment.cost * -1
         end
 
